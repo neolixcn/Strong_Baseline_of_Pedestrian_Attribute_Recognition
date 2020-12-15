@@ -15,13 +15,22 @@ from dataset.AttrDataset import AttrDataset, get_transform
 from loss.CE_loss import CEL_Sigmoid
 from models.base_block import FeatClassifier, BaseClassifier
 from models.resnet import resnet50, resnet101
-from models.resnest.resnest import resnest50
 
-from tools.function import get_model_log_path, get_pedestrian_metrics, get_reload_weight
+from tools.function import get_model_log_path, get_pedestrian_metrics
 from tools.utils import time_str, save_ckpt, ReDirectSTD, set_seed, AverageMeter
 
 set_seed(605)
 
+def get_reload_weight(model_path, model):
+    # 加载到cpu
+    model_dict = torch.load(model_path, map_location=lambda storage, loc: storage)
+    from collections import OrderedDict
+    new_state_dict = OrderedDict()
+    for k, v in model_dict["state_dicts"].items():
+        name = k[7:]  # 去掉 `module.`
+        new_state_dict[name] = v
+    model.load_state_dict(new_state_dict)
+    return model
 
 def main(args):
     visenv_name = args.dataset
@@ -39,44 +48,32 @@ def main(args):
     print(f'use GPU{args.device} for training')
     print(f'train set: {args.dataset} {args.train_split}, test set: {args.valid_split}')
 
-    train_tsfm, valid_tsfm = get_transform(args)
-    print(train_tsfm)
-
-    train_set = AttrDataset(args=args, split=args.train_split, transform=train_tsfm)
-
-    train_loader = DataLoader(
-        dataset=train_set,
-        batch_size=args.batchsize,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True,
-    )
+    _, valid_tsfm = get_transform(args)
 
     valid_set = AttrDataset(args=args, split=args.valid_split, transform=valid_tsfm)
 
     valid_loader = DataLoader(
         dataset=valid_set,
-        batch_size=args.batchsize,
+        batch_size=args.test_batchsize,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
     )
 
-    print(f'{args.train_split} set: {len(train_loader.dataset)}, '
-          f'{args.valid_split} set: {len(valid_loader.dataset)}, '
-          f'attr_num : {train_set.attr_num}')
+    print(f'{args.valid_split} set: {len(valid_loader.dataset)}, '
+          f'attr_num : {args.attr_num}')
 
     backbone = resnet50()
-    classifier = BaseClassifier(nattr=26)
+    classifier = BaseClassifier(nattr=args.attr_num)
     model = FeatClassifier(backbone, classifier)
-
-    if torch.cuda.is_available():
-        model = torch.nn.DataParallel(model).cuda()
+    # if torch.cuda.is_available():
+    #     model = torch.nn.DataParallel(model).cuda()
 
     print("reloading pretrained models")
 
-    exp_dir = os.path.join('exp_result', args.dataset)
-    model_path = os.path.join(exp_dir, args.dataset, 'img_model')
+    # exp_dir = os.path.join('exp_result', args.dataset)
+    # model_path = os.path.join(exp_dir, args.dataset, 'img_model')
+    model_path = args.pretrained_model
     model = get_reload_weight(model_path, model)
 
     model.eval()
@@ -84,18 +81,17 @@ def main(args):
     gt_list = []
     with torch.no_grad():
         for step, (imgs, gt_label, imgname) in enumerate(tqdm(valid_loader)):
-            imgs = imgs.cuda()
-            gt_label = gt_label.cuda()
+            # imgs = imgs.cuda()
+            # gt_label = gt_label.cuda()
             gt_list.append(gt_label.cpu().numpy())
             gt_label[gt_label == -1] = 0
             valid_logits = model(imgs)
             valid_probs = torch.sigmoid(valid_logits)
             preds_probs.append(valid_probs.cpu().numpy())
-
     gt_label = np.concatenate(gt_list, axis=0)
     preds_probs = np.concatenate(preds_probs, axis=0)
 
-    valid_result = get_pedestrian_metrics(gt_label, preds_probs)
+    valid_result = get_pedestrian_metrics(gt_label, preds_probs, threshold=0.4)
 
     print(f'Evaluation on test set, \n',
           'ma: {:.4f},  pos_recall: {:.4f} , neg_recall: {:.4f} \n'.format(
@@ -104,11 +100,16 @@ def main(args):
               valid_result.instance_acc, valid_result.instance_prec, valid_result.instance_recall,
               valid_result.instance_f1))
 
+    #
+
 
 if __name__ == '__main__':
     parser = argument_parser()
+    parser.add_argument("--pretrained-model", type=str, default="pa100k_ckpt_max.pth")
+    parser.add_argument("--attr-num", type=int, default=26)
     args = parser.parse_args()
-
+    args.valid_split = "test"
+    args.test_batchsize = 1
     main(args)
 
 """

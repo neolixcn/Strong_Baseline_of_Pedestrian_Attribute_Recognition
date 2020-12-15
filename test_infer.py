@@ -4,7 +4,6 @@ import pprint
 from collections import OrderedDict, defaultdict
 from pathlib import Path
 from PIL import Image
-
 import numpy as np
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -18,7 +17,7 @@ from loss.CE_loss import CEL_Sigmoid
 from models.base_block import FeatClassifier, BaseClassifier
 from models.resnet import resnet50
 
-from tools.function import get_model_log_path, get_pedestrian_metrics # get_reload_weight
+from tools.function import get_model_log_path, get_pedestrian_metrics
 from tools.utils import time_str, save_ckpt, ReDirectSTD, set_seed, AverageMeter
 
 set_seed(605)
@@ -56,8 +55,6 @@ def main(args):
 
     print("reloading pretrained models")
 
-    # exp_dir = os.path.join('exp_result', args.dataset)
-    # model_path = os.path.join(exp_dir, args.dataset, 'img_model')
     model_path = args.pretrained_model
     model = get_reload_weight(model_path, model).cuda()
 
@@ -68,7 +65,6 @@ def main(args):
     with torch.no_grad():
         for step, img_path in enumerate(img_list):
             img = Image.open(img_path)
-            # img = img.resize((192, 256))
             img = img.convert("RGB")
             org_img = np.array(img).copy()
             org_img = cv2.cvtColor(org_img, cv2.COLOR_RGB2BGR)
@@ -88,22 +84,19 @@ def main(args):
 
             # 1
             logits = valid_logits.flatten()
-            # print("logits:", logits)
+            probs = torch.sigmoid(logits)
             logits = logits.cpu().numpy()
             idx = np.where(logits>0)
-            # print("idx:", idx)
             print("img: {}\n labels:{}".format(img_path.name, args.attr_list[idx]))
             bg_img = np.ones([300,350,3]) * 255
             bg_img[:256, :192, :] = org_img
             h = 0
             for id in idx[0]:
-                text_line = str(args.attr_list[id])
-                # print(text_line)
+                text_line = str(args.attr_list[id]) + " {:.2f}".format(probs[id].data)
                 text_size, baseline = cv2.getTextSize(str(text_line), args.fontFace, args.fontScale, args.thickness)
                 h += baseline + text_size[1]
                 cv2.putText(bg_img, str(text_line), (193, h), args.fontFace, args.fontScale, (0, 255, 0), args.thickness, 8)
             cv2.imwrite(args.save_path + args.dataset + img_path.name , bg_img)
-
 
 
 if __name__ == '__main__':
@@ -111,22 +104,25 @@ if __name__ == '__main__':
     parser.add_argument("--pretrained-model", type=str, default="pa100k_ckpt_max.pth")
     parser.add_argument("--test-imgs", type=str, default="./test_images")
     parser.add_argument("--save-path", type=str, default="./test_results/")
+    parser.add_argument("--att-type", type=str, default="STD")
     parser.add_argument("--attr-num", type=int, default=26)
     args = parser.parse_args()
     args.fontScale = 0.4
     args.thickness = 1
     args.fontFace = cv2.FONT_HERSHEY_SIMPLEX
 
+    if "att_type" not in args:
+        args.att_type = args.dataset
     # 'PETA', 'PETA_dataset', 'PA100k', 'RAP', 'RAP2'
     # pa100k 26
-    if args.dataset == 'PA100k':
+    if args.att_type == 'PA100k':
         args.attr_list = np.array(['Hat', 'Glasses', 'ShortSleeve', 'LongSleeve', 'UpperStride', 'UpperLogo'
         , 'UpperPlaid', 'UpperSplice', 'LowerStripe', 'LowerPattern', 'LongCoat', 'Trousers', 'Shorts'
         , 'Skirt&Dress', 'boots', 'HandBag', 'ShoulderBag', 'Backpack', 'HoldObjectsInFront', 'AgeOver60'
         , 'Age18-60', 'AgeLess18', 'Female', 'Front', 'Side', 'Back'])
     
     #peta 35
-    elif args.dataset == 'PETA':
+    elif args.att_type== 'PETA':
         args.attr_list = np.array(['accessoryHat','accessoryMuffler','accessoryNothing','accessorySunglasses','hairLong'
         ,'upperBodyCasual', 'upperBodyFormal', 'upperBodyJacket', 'upperBodyLogo', 'upperBodyPlaid', 'upperBodyShortSleeve', 'upperBodyThinStripes', 'upperBodyTshirt','upperBodyOther','upperBodyVNeck'
         , 'lowerBodyCasual', 'lowerBodyFormal', 'lowerBodyJeans', 'lowerBodyShorts', 'lowerBodyShortSkirt','lowerBodyTrousers'
@@ -136,7 +132,7 @@ if __name__ == '__main__':
         , 'personalMale'])
 
     #rapv1
-    elif args.dataset == 'RAP':
+    elif args.att_type == 'RAP':
         args.attr_list = np.array(['hs-BaldHead','hs-LongHair','hs-BlackHair','hs-Hat','hs-Glasses','hs-Muffler'
         , 'ub-Shirt','ub-Sweater','ub-Vest','ub-TShirt','ub-Cotton','ub-Jacket','ub-SuitUp','ub-Tight','ub-ShortSleeve'
         , 'lb-LongTrousers','lb-Skirt','lb-ShortSkirt','lb-Dress','lb-Jeans','lb-TightTrousers'
@@ -148,7 +144,7 @@ if __name__ == '__main__':
         , 'action-Calling','action-Talking','action-Gathering','action-Holding','action-Pusing','action-Pulling','action-CarrybyArm','action-CarrybyHand'])
 
     #rapv2
-    elif args.dataset == 'RAP2':
+    elif args.att_type == 'RAP2':
         args.attr_list = np.array(['hs-BaldHead', 'hs-LongHair', 'hs-BlackHair', 'hs-Hat', 'hs-Glasses'
         , 'ub-Shirt','ub-Sweater','ub-Vest','ub-TShirt','ub-Cotton','ub-Jacket','ub-SuitUp','ub-Tight','ub-ShortSleeve','ub-Others'
         , 'lb-LongTrousers','lb-Skirt','lb-ShortSkirt','lb-Dress','lb-Jeans','lb-TightTrousers'
@@ -159,6 +155,21 @@ if __name__ == '__main__':
         , 'BodyFat','BodyNormal','BodyThin'
         , 'Customer','Employee'
         , 'action-Calling','action-Talking','action-Gathering','action-Holding','action-Pushing','action-Pulling','action-CarryingByArm','action-CarryingByHand','action-Other'])
+    
+    # customed dataset
+    elif args.att_type == 'STD':
+        args.attr_list = np.array(['Female', 
+                        'AgeLess16', 'Age17-45', 'Age46-60', 'Ageover60', 
+                        'Front', 'Side', 'Back', 
+                        'a-Backpack', 'a-ShoulderBag', 
+                        'hs-Hat', 
+                        'hs-Glasses', 
+                        'ub-ShortSleeve', 'ub-LongSleeve', 
+                        'ub-Shirt', 'ub-Sweater', 'ub-Vest', 'ub-TShirt', 'ub-Cotton', 'ub-Jacket', 'ub-SuitUp', 'ub-Coat', 
+                        'ub-Black', 'ub-Blue', 'ub-Brown', 'ub-Green', 'ub-Grey', 'ub-Orange', 'ub-Pink', 'ub-Purple', 'ub-Red', 'ub-White', 'ub-Yellow', 
+                        'lb-LongTrousers', 'lb-Shorts', 'lb-ShortSkirt', 'lb-Dress', 
+                        'lb-Black', 'lb-Blue', 'lb-Brown', 'lb-Green', 'lb-Grey', 'lb-Orange', 'lb-Pink', 'lb-Purple', 'lb-Red', 'lb-White', 'lb-Yellow', 
+                        ])
 
     main(args)
 
