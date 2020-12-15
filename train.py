@@ -20,7 +20,7 @@ set_seed(605)
 
 
 def main(args):
-    visenv_name = args.dataset
+    visenv_name = time_str() + "_ep_" + str(args.train_epoch) + "_bs_" + str(args.batchsize)
     exp_dir = os.path.join('exp_result', args.dataset)
     model_dir, log_dir = get_model_log_path(exp_dir, visenv_name)
     stdout_file = os.path.join(log_dir, f'stdout_{time_str()}.txt')
