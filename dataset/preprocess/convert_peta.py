@@ -7,9 +7,6 @@ import json
 from easydict import EasyDict
 
 np.random.seed(0)
-random.seed(0)
-
-# note: ref by annotation.md
 
 POSITIVE = 1
 NEGATIVE = 0
@@ -41,10 +38,10 @@ convert_dict = {
     'a-Backpack': 'carryingBackpack',
     'a-ShoulderBag': 'carryingMessengerBag',
     'hs-Hat': 'accessoryHat',
-    'hs-Glasses': 'accessorySunglasses',
+    'hs-Glasses': None, # 'accessorySunglasses'
     'ub-ShortSleeve': 'upperBodyShortSleeve',
     'ub-LongSleeve': 'upperBodyLongSleeve',
-    'ub-Shirt': 'upperBodyTshirt',
+    'ub-Shirt': None,
     'ub-Sweater': 'upperBodySweater',
     'ub-Vest': None,
     'ub-TShirt': 'upperBodyTshirt',
@@ -52,32 +49,32 @@ convert_dict = {
     'ub-Jacket': 'upperBodyJacket',
     'ub-SuitUp': 'upperBodySuit',
     'ub-Coat': None,
-    'ub-Black': 'upperbodyBlack',
-    'ub-Blue': 'upperbodyBlue',
-    'ub-Brown': 'upperbodyBrown',
-    'ub-Green': 'upperbodyGreen',
-    'ub-Grey': 'upperbodyGrey',
-    'ub-Orange': 'upperbodyOrange',
-    'ub-Pink': 'upperbodyPink',
-    'ub-Purple': 'upperbodyPurple',
-    'ub-Red': 'upperbodyRed',
-    'ub-White': 'upperbodyWhite',
-    'ub-Yellow': 'upperbodyYellow',
+    'ub-Black': 'upperBodyBlack',
+    'ub-Blue': 'upperBodyBlue',
+    'ub-Brown': 'upperBodyBrown',
+    'ub-Green': 'upperBodyGreen',
+    'ub-Grey': 'upperBodyGrey',
+    'ub-Orange': 'upperBodyOrange',
+    'ub-Pink': 'upperBodyPink',
+    'ub-Purple': 'upperBodyPurple',
+    'ub-Red': 'upperBodyRed',
+    'ub-White': 'upperBodyWhite',
+    'ub-Yellow': 'upperBodyYellow',
     'lb-LongTrousers': 'lowerBodyTrousers',
     'lb-Shorts': 'lowerBodyShorts',
     'lb-ShortSkirt': 'lowerBodyShortSkirt',
     'lb-Dress': 'lowerBodyLongSkirt',
-    'lb-Black': 'lowerbodyBlack',
-    'lb-Blue': 'lowerbodyBlue',
-    'lb-Brown': 'lowerbodyBrown',
-    'lb-Green': 'lowerbodyGreen',
-    'lb-Grey': 'lowerbodyGrey',
-    'lb-Orange': 'lowerbodyOrange',
-    'lb-Pink': 'lowerbodyPink',
-    'lb-Purple': 'lowerbodyPurple',
-    'lb-Red': 'lowerbodyRed',
-    'lb-White': 'lowerbodyWhite',
-    'lb-Yellow': 'lowerbodyYellow'
+    'lb-Black': 'lowerBodyBlack',
+    'lb-Blue': 'lowerBodyBlue',
+    'lb-Brown': 'lowerBodyBrown',
+    'lb-Green': 'lowerBodyGreen',
+    'lb-Grey': 'lowerBodyGrey',
+    'lb-Orange': 'lowerBodyOrange',
+    'lb-Pink': 'lowerBodyPink',
+    'lb-Purple': 'lowerBodyPurple',
+    'lb-Red': 'lowerBodyRed',
+    'lb-White': 'lowerBodyWhite',
+    'lb-Yellow': 'lowerBodyYellow'
 }
 
 # customed 2 baidu
@@ -102,9 +99,9 @@ baidu_dict ={
     'ub-Vest': {'upper_wear_fg':'无袖'},
     'ub-TShirt': {'upper_wear_fg':'T恤'},
     'ub-Cotton': {'upper_wear_fg':'羽绒服'},
-    'ub-Jacket': {'upper_wear_fg':'夹克'},
+    'ub-Jacket': {'upper_wear_fg':['外套', '夹克']},
     'ub-SuitUp': {'upper_wear_fg':'西装'},
-    'ub-Coat': {'upper_wear_fg':'外套'},
+    'ub-Coat': {'upper_wear_fg':'风衣'},
     'ub-Black': {'upper_color': '黑'},
     'ub-Blue': {'upper_color': '蓝'},
     'ub-Brown': {'upper_color': '棕'},
@@ -150,11 +147,11 @@ def generate_data_description(save_dir):
     dataset.attr_name = attr_list
     dataset.image_name = []
 
-    sub_dir = Path(save_dir).glob("*")
+    # sub_dir = Path(save_dir).glob("*")
+    sub_dir = [f for f in Path(save_dir).iterdir() if f.is_dir()]
+    label_list = []
     for sub in sub_dir:
         sub = sub / "archive"
-        import pdb
-        pdb.set_trace()
         # peta 图片格式多，不加后缀，但会把txt文件也加入列表
         img_list =sorted( list(sub.glob("*")))
         # 读取并创建原始label字典
@@ -172,15 +169,17 @@ def generate_data_description(save_dir):
         baidu_json = sub / "bdLabel.json"
         with open(baidu_json, "r") as f:
             db_label_list = json.load(f)
-        index_list = [data["name"] for data in db_label_list]
-        label_list = []
+        index_list = [data["img_name"] for data in db_label_list]
+        
         for img in img_list:
+            import pdb
+            pdb.set_trace()
             if "Label" in str(img.name):
                 # img_list.remove(img)
                 continue
             dataset.image_name.append(str(img))
             label = []
-            peta_label = label_dict[img.stem.split("_")[0]]
+            peta_label = label_dict[img.name.split("_")[0]]
             db_label = db_label_list[index_list.index(img.name)]
             for index, att in enumerate(attr_list):
                 # peta有对应标签
@@ -214,24 +213,23 @@ def generate_data_description(save_dir):
                             label.append(POSITIVE)
                         else:
                             label.append(NEGATIVE)
-                    # label.append(NEGATIVE)
-                    #         att_num += peta_label[convert_dict[att]]
-                    #     label.append
-                    # else:
-                    #     label.append(peta_label[convert_dict[att]])
             label_list.append(label)
-    # (19000, 35)
+
     dataset.label = np.array(label_list)
 
     # 拆分数据集
     dataset.partition = EasyDict()
-    dataset.partition.train = []
-    dataset.partition.val = []
+    # dataset.partition.train = []
+    # dataset.partition.val = []
+    dataset.partition.trainval = []
+    dataset.partition.test = []
 
-    # dataset.weight_train = []
-    # dataset.weight_trainval = []
+    indices = np.random.permutation(len(label_list))
+    training_idx, test_idx = indices[:int(0.8*len(label_list))], indices[int(0.8*len(label_list)):]
+    dataset.partition.trainval = training_idx
+    dataset.partition.test = test_idx
     # 全部作为训练集
-    dataset.partition.train = np.arange(len(label_list))
+    # dataset.partition.train = np.arange(len(label_list))
 
     with open(os.path.join(save_dir, 'peta_dataset.pkl'), 'wb+') as f:
         pickle.dump(dataset, f)

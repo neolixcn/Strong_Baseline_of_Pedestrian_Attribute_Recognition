@@ -1,16 +1,10 @@
 import os
 from pathlib import Path
 import numpy as np
-import random
 import pickle
 import json
 from easydict import EasyDict
 from scipy.io import loadmat
-
-np.random.seed(0)
-random.seed(0)
-
-# note: ref by annotation.md
 
 POSITIVE = 1
 NEGATIVE = 0
@@ -27,14 +21,6 @@ attr_list = ['Female',
                     'lb-LongTrousers', 'lb-Shorts', 'lb-ShortSkirt', 'lb-Dress', 
                     'lb-Black', 'lb-Blue', 'lb-Brown', 'lb-Green', 'lb-Grey', 'lb-Orange', 'lb-Pink', 'lb-Purple', 'lb-Red', 'lb-White', 'lb-Yellow', 
                     ]
-
-org_list = ['Female', 
-    'AgeOver60', 'Age18-60', 'AgeLess18', 
-    'Front', 'Side', 'Back', 'Hat', 'Glasses', 
-    'HandBag', 'ShoulderBag', 'Backpack', 'HoldObjectsInFront', 
-    'ShortSleeve', 'LongSleeve', 
-    'UpperStride', 'UpperLogo', 'UpperPlaid', 'UpperSplice', 
-    'LowerStripe', 'LowerPattern', 'LongCoat', 'Trousers', 'Shorts', 'Skirt&Dress', 'boots']
 
 # customed 2 pa100k
 convert_dict={
@@ -60,7 +46,7 @@ convert_dict={
     'ub-Cotton': None,
     'ub-Jacket': None,
     'ub-SuitUp': None,
-    'ub-Coat': None, #'LongCoat',
+    'ub-Coat': 'LongCoat', # None
     'ub-Black': None,
     'ub-Blue': None,
     'ub-Brown': None,
@@ -111,9 +97,9 @@ baidu_dict ={
     'ub-Vest': {'upper_wear_fg':'无袖'},
     'ub-TShirt': {'upper_wear_fg':'T恤'},
     'ub-Cotton': {'upper_wear_fg':'羽绒服'},
-    'ub-Jacket': {'upper_wear_fg':'夹克'},
+    'ub-Jacket': {'upper_wear_fg':['外套', '夹克']}, #
     'ub-SuitUp': {'upper_wear_fg':'西装'},
-    'ub-Coat': {'upper_wear_fg':'外套'},
+    'ub-Coat': {'upper_wear_fg':'风衣'}, #coat这里仅指风衣
     'ub-Black': {'upper_color': '黑'},
     'ub-Blue': {'upper_color': '蓝'},
     'ub-Brown': {'upper_color': '棕'},
@@ -156,30 +142,33 @@ def generate_data_description(save_dir):
     dataset.description = 'pa100k'
     dataset.root = os.path.join(save_dir, "data/release_data/release_data")
     dataset.attr_name = attr_list
-    dataset.image_name = []
     pa100k_data = loadmat(os.path.join(save_dir, 'annotation/annotation.mat'))
+    train_image_name = [pa100k_data['train_images_name'][i][0][0] for i in range(80000)]
+    val_image_name = [pa100k_data['val_images_name'][i][0][0] for i in range(10000)]
+    test_image_name = [pa100k_data['test_images_name'][i][0][0] for i in range(10000)]
+    dataset.image_name = train_image_name + val_image_name + test_image_name
     org_att_list = [pa100k_data['attributes'][i][0][0] for i in range(26)]
-    split_img_list = ['train', 'val', 'test']
+    split_img = {'train':80000, 'val':10000, 'test':10000}
 
     # 读取并创建百度label字典
-    baidu_json = "bdLabel.json"
+    baidu_json = save_dir + "bdLabel.json"
     with open(baidu_json, "r") as f:
         db_label_list = json.load(f)
-    index_list = [data["name"] for data in db_label_list]
+    index_list = [data["img_name"] for data in db_label_list]
 
-    for sub in split_img_list:
-        sub_list = pa100k_data[sub + "_images_name"]
+    label_list = []
+    for sub, length in split_img.items():
+        sub_img_list = [pa100k_data[f'{sub}_images_name'][i][0][0] for i in range(split_img[sub])]
         org_label = pa100k_data[sub + "_label"]
 
-        label_list = []
-        for id, img in enumerate(sub_list):
+        for id, img in enumerate(sub_img_list):
             label = []
             pa100k_label = org_label[id, :]
-            db_label = db_label_list[index_list.index(img.name)]
+            db_label = db_label_list[index_list.index(img)]
             for index, att in enumerate(attr_list):
                 # peta有对应标签
                 if convert_dict[att]:
-                    label.append(pa100k_label[org_att_list.index(att)])
+                    label.append(pa100k_label[org_att_list.index(convert_dict[att])])
                 # peta无对应标签
                 else:
                     # 字典需要获取key
@@ -200,10 +189,10 @@ def generate_data_description(save_dir):
 
     # 拆分数据集
     dataset.partition = EasyDict()
-    dataset.partition.train = np.arange(0, 80000)  # np.array(range(80000))
-    dataset.partition.val = np.arange(80000, 90000)  # np.array(range(80000, 90000))
-    dataset.partition.test = np.arange(90000, 100000)  # np.array(range(90000, 100000))
-    dataset.partition.trainval = np.arange(0, 90000)  # np.array(range(90000))
+    dataset.partition.train = np.arange(0, 80000)
+    dataset.partition.val = np.arange(80000, 90000)
+    dataset.partition.test = np.arange(90000, 100000)
+    dataset.partition.trainval = np.arange(0, 90000)
 
     with open(os.path.join(save_dir, 'pa100k_dataset.pkl'), 'wb+') as f:
         pickle.dump(dataset, f)
