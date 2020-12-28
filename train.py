@@ -12,7 +12,8 @@ from config import argument_parser
 from dataset.AttrDataset import AttrDataset, get_transform
 from loss.CE_loss import CEL_Sigmoid
 from models.base_block import FeatClassifier, BaseClassifier
-from models.resnet import resnet50
+from models.resnet import resnet50, resnext50_32x4d, resnet101
+from models.resnest.resnest import resnest50
 from tools.function import get_model_log_path, get_pedestrian_metrics
 from tools.utils import time_str, save_ckpt, ReDirectSTD, set_seed
 
@@ -66,6 +67,17 @@ def main(args):
     sample_weight = labels.mean(0)
 
     backbone = resnet50()
+    # backbone = resnext50_32x4d(pretrained=True)
+    # backbone = resnet101(pretrained=True)
+    
+    # backbone = resnest50(pretrained=True)
+    #or use torch.hub
+    # import torch
+    # get list of models
+    # torch.hub.list('zhanghang1989/ResNeSt', force_reload=True)
+    # load pretrained models, using ResNeSt-50 as an example
+    # backbone = torch.hub.load('zhanghang1989/ResNeSt', 'resnest50', pretrained=True)
+
     classifier = BaseClassifier(nattr=train_set.attr_num)
     model = FeatClassifier(backbone, classifier)
 
