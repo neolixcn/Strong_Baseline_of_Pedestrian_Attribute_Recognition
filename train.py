@@ -49,7 +49,12 @@ def main(args):
         num_workers=4,
         pin_memory=True,
     )
-    valid_set = AttrDataset(args=args, split=args.valid_split, transform=valid_tsfm)
+
+    # change test dataset
+    args_test = copy.copy(args)
+    args_test.dataset = "test"
+    valid_set = AttrDataset(args=args_test, split="test", transform=valid_tsfm)
+    # valid_set = AttrDataset(args=args, split=args.valid_split, transform=valid_tsfm)
 
     valid_loader = DataLoader(
         dataset=valid_set,
