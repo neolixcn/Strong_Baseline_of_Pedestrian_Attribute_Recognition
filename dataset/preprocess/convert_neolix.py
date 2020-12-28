@@ -1,0 +1,79 @@
+import os
+from pathlib import Path
+import numpy as np
+import pickle
+import json
+from easydict import EasyDict
+from scipy.io import loadmat
+from scipy.special import softmax
+
+np.random.seed(0)
+
+POSITIVE = 1
+NEGATIVE = 0
+
+# STD是TEST的子集，skirt类别融合到Dress中。
+attr_list = ['Female', 
+                    'AgeLess16', 'Age17-45', 'Age46-60', 'Ageover60', 
+                    'Front', 'Side', 'Back', 
+                    'a-Backpack', 'a-ShoulderBag', 
+                    'hs-Hat', 
+                    'hs-Glasses', 
+                    'ub-ShortSleeve', 'ub-LongSleeve', 
+                    'ub-Shirt', 'ub-Sweater', 'ub-Vest', 'ub-TShirt', 'ub-Cotton', 'ub-Jacket', 'ub-SuitUp', 'ub-Coat', 
+                    'ub-Black', 'ub-Blue', 'ub-Brown', 'ub-Green', 'ub-Grey', 'ub-Orange', 'ub-Pink', 'ub-Purple', 'ub-Red', 'ub-White', 'ub-Yellow', 
+                    'lb-LongTrousers', 'lb-Shorts', 'lb-ShortSkirt', 'lb-Dress', 
+                    'lb-Black', 'lb-Blue', 'lb-Brown', 'lb-Green', 'lb-Grey', 'lb-Orange', 'lb-Pink', 'lb-Purple', 'lb-Red', 'lb-White', 'lb-Yellow', 
+                    ]
+
+def make_dir(path):
+    if os.path.exists(path):
+        pass
+    else:
+        os.mkdir(path)
+
+def generate_data_description(save_dir, org_json,resample_prob=None):
+    """
+    create a dataset description file, which consists of images, labels
+    """
+    dataset = EasyDict()
+    dataset.description = 'neolix'
+    dataset.root = '/data/pantengteng/neolix_par/images'
+    dataset.attr_name = attr_list
+    dataset.image_name = []
+
+    with open(org_json, "r") as f:
+        org_label_list = json.load(f)
+    index_list = [data["img_name"] for data in org_label_list]
+    dataset.image_name =  np.array(index_list)
+    label_list = []
+    for id, img in enumerate(index_list):
+        org_label = org_label_list[id]
+        label = []
+        for index, att in enumerate(attr_list):
+            # test有对应标签
+            if att in org_label["attribute"]:
+                label.append(POSITIVE)
+            else:
+                label.append(NEGATIVE)
+        label_list.append(label)
+    dataset.label = np.array(label_list)
+
+    # 拆分数据集
+    dataset.partition = EasyDict()
+    if resample_prob:
+        # 重采样
+        prob = softmax(np.load(resample_prob).flatten())
+        sample_list = np.random.choice(range(len(label_list)), size=2000, replace=True, p=prob)
+        dataset.partition.trainval = sample_list
+    else:
+        # dataset.partition.trainval = np.arange(len(label_list))
+        dataset.partition.test = np.arange(len(label_list))
+    with open(os.path.join(save_dir, 'test_test_dataset.pkl'), 'wb+') as f:
+        pickle.dump(dataset, f)
+
+if __name__ == "__main__":
+    save_dir = '/home/pantengteng/Programs/Strong_Baseline_of_Pedestrian_Attribute_Recognition/data/neolix'
+    json_file = "/home/pantengteng/Programs/Strong_Baseline_of_Pedestrian_Attribute_Recognition/data/test/testLabel.json"
+    # resample_prob = "neolix_resample_exp4_01.npy"
+    generate_data_description(save_dir, json_file)

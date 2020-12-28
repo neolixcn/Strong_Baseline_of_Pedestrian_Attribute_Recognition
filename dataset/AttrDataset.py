@@ -13,7 +13,7 @@ class AttrDataset(data.Dataset):
 
     def __init__(self, split, args, transform=None, target_transform=None):
 
-        assert args.dataset in ['PETA', 'PETA_dataset', 'PA100k', 'RAP', 'RAP2', 'test', 'combined'], \
+        assert args.dataset in ['PETA', 'PETA_dataset', 'PA100k', 'RAP', 'RAP2', 'test', 'combined', 'neolix'], \
             f'dataset name {args.dataset} is not exist'
 
         data_path = get_pkl_rootpath(args.dataset)
@@ -71,6 +71,9 @@ def get_transform(args):
         T.Pad(10),
         T.RandomCrop((height, width)),
         T.RandomHorizontalFlip(),
+        T.RandomRotation(10), #
+        #T.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5), #
+        # 
         T.ToTensor(),
         normalize,
     ])
