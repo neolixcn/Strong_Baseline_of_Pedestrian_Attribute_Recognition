@@ -51,14 +51,15 @@ def generate_data_description(save_dir, peta_dir, pa100k_dir):
     # dataset.partition.val = []
     dataset.partition.trainval = []
     dataset.partition.test = []
-    import pdb; pdb.set_trace()
-    trainval = np.concatenate((peta_dataset.partition.trainval, pa100k_dataset.partition.trainval),0)
+
+    pa100k_trainval_indice = pa100k_dataset.partition.trainval + peta_dataset.label.shape[0]
+    trainval = np.concatenate((peta_dataset.partition.trainval, pa100k_trainval_indice),0)
     indices = np.random.permutation(trainval)
     dataset.partition.trainval = indices
-    dataset.partition.test = np.concatenate((peta_dataset.partition.test, pa100k_dataset.partition.test),0)
+    pa100k_test_indice = pa100k_dataset.partition.test + peta_dataset.label.shape[0]
+    dataset.partition.test = np.concatenate((peta_dataset.partition.test, pa100k_test_indice),0)
 
-
-    with open(os.path.join(save_dir, 'dataset.pkl'), 'wb+') as f:
+    with open(os.path.join(save_dir, 'test_dataset.pkl'), 'wb+') as f:
         pickle.dump(dataset, f)
 
 if __name__ == "__main__":
