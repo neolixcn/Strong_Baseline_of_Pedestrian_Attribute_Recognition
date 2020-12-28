@@ -49,6 +49,9 @@ list = ['3DPeS', 'CAVIAR4REID', 'CUHK', 'GRID', 'i-LID',
 filePath = '/data/pantengteng/PETA/data/SARC3D/archive'
 # filePath = '/data/pantengteng/PETA/data/'+l+'/archive' #PETA数据集
 
+jsonPath = "SARC3D.json"
+json_toPath = "test.json"
+suffix = "bmp"
 
 # 获取文件夹中的图片（以数据传入接口）
 def get_file_content(filePath):
@@ -59,16 +62,16 @@ def get_file_content(filePath):
 # 将未在json文件中的图片生成列表，再传入函数中
 dataArray = []
 data = []
-if Path('SARC3D.json').exists():
+if Path(jsonPath).exists():
     # 注意是否手动添加了[]以及去掉最后一个标签的,
-    with open('SARC3D.json', encoding="utf-8") as f:
+    with open(jsonPath, encoding="utf-8") as f:
         images = json.load(f)
     for image in images:
         data.append(image['img_name'])
     for files in os.listdir(filePath):
         if files not in data:
             # pdb.set_trace()
-            if files[-3:] == 'bmp':
+            if files[-3:] == suffix:
                 files_all_name = os.path.join(filePath, files)
                 dataArray.append(files_all_name)
 else:
@@ -122,7 +125,7 @@ def mFuction(dataArray):
                 e = json.dumps(res, indent=2, ensure_ascii=False)
                 i += 1
                 # pdb.set_trace()
-                with open('test.json', 'a', encoding='utf-8') as w:
+                with open(json_toPath, 'a', encoding='utf-8') as w:
                     w.write(e+',')
                     w.write('\n')
 
