@@ -1,6 +1,7 @@
 import os
 import pprint
 from collections import OrderedDict, defaultdict
+import copy
 
 import numpy as np
 import torch
@@ -85,6 +86,20 @@ def main(args):
 
     classifier = BaseClassifier(nattr=train_set.attr_num)
     model = FeatClassifier(backbone, classifier)
+
+    if args.ft is not None:
+        print('finetune from ', args.ft)
+        state_dict = torch.load(args.ft)["state_dicts"]
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            if "module" in k:
+                name = k[7:]  # 去掉 `module.`
+            else:
+                name = k 
+            if name not in model.state_dict():
+                continue
+            new_state_dict[name] = v
+        model.load_state_dict(new_state_dict) #, strict=True)
 
     if torch.cuda.is_available():
         model = torch.nn.DataParallel(model).cuda()
