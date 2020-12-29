@@ -26,7 +26,7 @@ attr_list = ['Female',
 
 # customed 2 peta
 convert_dict = {
-    'Female': None,
+    'Female': 'personalFeMale',
     # 'Male': 'personalMale',
     'AgeLess16': 'personalLess15',
     'Age17-45': ['personalLess45', 'personalLess30'],
