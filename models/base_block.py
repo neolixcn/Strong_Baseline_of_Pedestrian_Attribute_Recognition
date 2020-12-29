@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.nn.modules.batchnorm import _BatchNorm
 
 
-class BaseClassifier(nn.Module):
+class BaseClassifier1(nn.Module):
     def __init__(self, nattr):
         super().__init__()
         self.logits = nn.Sequential(
@@ -21,6 +21,25 @@ class BaseClassifier(nn.Module):
         x = self.logits(feat)
         return x
 
+class BaseClassifier(nn.Module):
+    def __init__(self, nattr):
+        super().__init__()
+        # self.logits = nn.Sequential(
+        #     nn.Linear(2048, nattr),
+        #     #nn.BatchNorm1d(nattr)
+        # )
+        self.logits = nn.Conv2d(2048, nattr, kernel_size=1)
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+
+    def fresh_params(self):
+        return self.parameters()
+
+    def forward(self, feature):
+        # feat = self.avg_pool(feature).view(feature.size(0), -1)
+        # x = self.logits(feat)
+        feat = self.avg_pool(feature)
+        x = self.logits(feat).view(feat.size(0), -1)
+        return x
 
 def initialize_weights(module):
     for m in module.children():
@@ -43,6 +62,7 @@ class FeatClassifier(nn.Module):
 
         self.backbone = backbone
         self.classifier = classifier
+        # self.sigmoid = nn.Sigmoid()
 
     def fresh_params(self):
         params = self.classifier.fresh_params()
@@ -52,6 +72,8 @@ class FeatClassifier(nn.Module):
         return self.backbone.parameters()
 
     def forward(self, x, label=None):
+        # x = x.permute(0,3,1,2)
         feat_map = self.backbone(x)
         logits = self.classifier(feat_map)
+        # logits = self.sigmoid(logits)
         return logits
