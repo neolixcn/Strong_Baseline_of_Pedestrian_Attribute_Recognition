@@ -7,6 +7,7 @@ def argument_parser():
 
     parser.add_argument("dataset", type=str, default="RAP")
     parser.add_argument("--debug", action='store_false')
+    parser.add_argument("--ft", type=str, default=None)
 
     parser.add_argument("--batchsize", type=int, default=64)
     parser.add_argument("--train_epoch", type=int, default=30)

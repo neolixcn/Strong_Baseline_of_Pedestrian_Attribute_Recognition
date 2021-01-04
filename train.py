@@ -1,6 +1,7 @@
 import os
 import pprint
 from collections import OrderedDict, defaultdict
+import copy
 
 import numpy as np
 import torch
@@ -12,7 +13,8 @@ from config import argument_parser
 from dataset.AttrDataset import AttrDataset, get_transform
 from loss.CE_loss import CEL_Sigmoid
 from models.base_block import FeatClassifier, BaseClassifier
-from models.resnet import resnet50
+from models.resnet import resnet50, resnext50_32x4d, resnet101
+from models.resnest.resnest import resnest50
 from tools.function import get_model_log_path, get_pedestrian_metrics
 from tools.utils import time_str, save_ckpt, ReDirectSTD, set_seed
 
@@ -20,7 +22,7 @@ set_seed(605)
 
 
 def main(args):
-    visenv_name = args.dataset
+    visenv_name = time_str() + "_ep_" + str(args.train_epoch) + "_bs_" + str(args.batchsize)
     exp_dir = os.path.join('exp_result', args.dataset)
     model_dir, log_dir = get_model_log_path(exp_dir, visenv_name)
     stdout_file = os.path.join(log_dir, f'stdout_{time_str()}.txt')
@@ -48,7 +50,12 @@ def main(args):
         num_workers=4,
         pin_memory=True,
     )
-    valid_set = AttrDataset(args=args, split=args.valid_split, transform=valid_tsfm)
+
+    # change test dataset
+    args_test = copy.copy(args)
+    args_test.dataset = "test"
+    valid_set = AttrDataset(args=args_test, split="test", transform=valid_tsfm)
+    # valid_set = AttrDataset(args=args, split=args.valid_split, transform=valid_tsfm)
 
     valid_loader = DataLoader(
         dataset=valid_set,
@@ -66,8 +73,33 @@ def main(args):
     sample_weight = labels.mean(0)
 
     backbone = resnet50()
+    # backbone = resnext50_32x4d(pretrained=True)
+    # backbone = resnet101(pretrained=True)
+    
+    # backbone = resnest50(pretrained=True)
+    #or use torch.hub
+    # import torch
+    # get list of models
+    # torch.hub.list('zhanghang1989/ResNeSt', force_reload=True)
+    # load pretrained models, using ResNeSt-50 as an example
+    # backbone = torch.hub.load('zhanghang1989/ResNeSt', 'resnest50', pretrained=True)
+
     classifier = BaseClassifier(nattr=train_set.attr_num)
     model = FeatClassifier(backbone, classifier)
+
+    if args.ft is not None:
+        print('finetune from ', args.ft)
+        state_dict = torch.load(args.ft)["state_dicts"]
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            if "module" in k:
+                name = k[7:]  # 去掉 `module.`
+            else:
+                name = k 
+            if name not in model.state_dict():
+                continue
+            new_state_dict[name] = v
+        model.load_state_dict(new_state_dict) #, strict=True)
 
     if torch.cuda.is_available():
         model = torch.nn.DataParallel(model).cuda()
